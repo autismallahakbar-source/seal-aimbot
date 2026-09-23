@@ -19,7 +19,6 @@ local ESPTab        = Window:CreateTab("ESP", nil)
 local KillSoundTab  = Window:CreateTab("Kill Sound", nil)
 local ChecksTab     = Window:CreateTab("Checks", nil)
 local MovementTab   = Window:CreateTab("Movement", nil)
-local SealPhotoTab  = Window:CreateTab("Seal's Photo", nil)
 
 -- ===== СЕРВИСЫ =====
 local Players           = game:GetService("Players")
@@ -182,12 +181,12 @@ end
 
 -- ===== FOV CIRCLE =====
 local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible  = false
-FOVCircle.Radius   = Settings.FOVRadius
+FOVCircle.Visible   = false
+FOVCircle.Radius    = Settings.FOVRadius
 FOVCircle.Thickness = 2
-FOVCircle.Color    = Color3.fromRGB(0, 255, 255)
-FOVCircle.Filled   = false
-FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.Color     = Color3.fromRGB(0, 255, 255)
+FOVCircle.Filled    = false
+FOVCircle.Position  = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 -- ===== ESP СИСТЕМА =====
 local ESPBoxes = {}
@@ -352,11 +351,11 @@ local function startSpin()
         if not root then return end
         local motor = root:FindFirstChild("SpinMotor")
         if not motor then
-            motor               = Instance.new("BodyAngularVelocity")
-            motor.Name          = "SpinMotor"
-            motor.Parent        = root
-            motor.MaxTorque     = Vector3.new(0, math.huge, 0)
-            motor.P            = 10000
+            motor           = Instance.new("BodyAngularVelocity")
+            motor.Name      = "SpinMotor"
+            motor.Parent    = root
+            motor.MaxTorque = Vector3.new(0, math.huge, 0)
+            motor.P         = 10000
         end
         motor.AngularVelocity = Vector3.new(0, Settings.SpinSpeed * math.pi * 2, 0)
     end)
@@ -409,11 +408,11 @@ local function startFly()
             flyBodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
         end
 
-        local cam    = Workspace.CurrentCamera
-        local camCF  = cam.CFrame
+        local cam     = Workspace.CurrentCamera
+        local camCF   = cam.CFrame
         local camLook = camCF.LookVector.Unit
 
-        hrp2.CFrame     = CFrame.new(hrp2.Position, hrp2.Position + camLook)
+        hrp2.CFrame      = CFrame.new(hrp2.Position, hrp2.Position + camLook)
         hrp2.RotVelocity = Vector3.new(0, 0, 0)
         hrp2.Velocity    = Vector3.new(0, 0, 0)
 
@@ -527,47 +526,6 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
 end)
 
 -- ==========================================================
--- SEAL'S PHOTO WINDOW
--- ==========================================================
-local pictureGui              = Instance.new("ScreenGui")
-pictureGui.Name               = "SealPictureGui"
-pictureGui.Parent             = PlayerGui
-pictureGui.ResetOnSpawn       = false
-pictureGui.Enabled            = false
-
-local pictureFrame            = Instance.new("Frame")
-pictureFrame.Parent           = pictureGui
-pictureFrame.Size             = UDim2.new(0, 400, 0, 400)
-pictureFrame.Position         = UDim2.new(0.5, -200, 0.5, -200)
-pictureFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-pictureFrame.BorderSizePixel  = 2
-pictureFrame.BorderColor3     = Color3.fromRGB(255, 255, 255)
-pictureFrame.Active           = true
-pictureFrame.Draggable        = true
-
-local pictureImage                 = Instance.new("ImageLabel")
-pictureImage.Parent                = pictureFrame
-pictureImage.Size                  = UDim2.new(1, -20, 1, -60)
-pictureImage.Position              = UDim2.new(0, 10, 0, 10)
-pictureImage.BackgroundTransparency = 1
-pictureImage.Image                 = "rbxassetid://94513154691410"
-pictureImage.ScaleType             = Enum.ScaleType.Fit
-
-local closeButton                  = Instance.new("TextButton")
-closeButton.Parent                 = pictureFrame
-closeButton.Size                   = UDim2.new(0, 100, 0, 30)
-closeButton.Position               = UDim2.new(0.5, -50, 1, -40)
-closeButton.BackgroundColor3       = Color3.fromRGB(200, 50, 50)
-closeButton.TextColor3             = Color3.fromRGB(255, 255, 255)
-closeButton.BorderSizePixel        = 0
-closeButton.Font                   = Enum.Font.GothamBold
-closeButton.TextSize               = 14
-closeButton.Text                   = "Close"
-closeButton.MouseButton1Click:Connect(function()
-    pictureGui.Enabled = false
-end)
-
--- ==========================================================
 -- GUI — AIMBOT
 -- ==========================================================
 MainTab:CreateToggle({
@@ -603,7 +561,6 @@ MainTab:CreateSlider({
     end
 })
 
--- ✅ ИЗМЕНЕНО: Smoothness от 0.01 до 1.0
 MainTab:CreateSlider({
     Name         = "Smoothness",
     Range        = {0.01, 1.0},
@@ -636,8 +593,6 @@ SpinTab:CreateSlider({
     Flag         = "spin_speed",
     Callback = function(Value) Settings.SpinSpeed = Value end
 })
-
--- ❌ ВКЛАДКА TRIGGERBOT УДАЛЕНА ПОЛНОСТЬЮ
 
 -- ==========================================================
 -- GUI — ESP
@@ -781,18 +736,11 @@ MovementTab:CreateSlider({
     Callback = function(Value) Settings.SpeedValue = Value end
 })
 
--- ==========================================================
--- GUI — SEAL'S PHOTO
--- ==========================================================
-SealPhotoTab:CreateButton({
-    Name = "Show Seal",
-    Callback = function() pictureGui.Enabled = true end
-})
-
-SealPhotoTab:CreateLabel("⚠️ If you open this photo in Knife Duels, you will be banned for 1 day.")
+-- ❌ ВКЛАДКА SEAL'S PHOTO УДАЛЕНА ПОЛНОСТЬЮ
 
 Rayfield:Notify({
     Title    = "Seal Aimbot Loaded",
     Content  = "E = Aimbot | G = ESP | = = Stealth | Kill Sound ready",
     Duration = 4,
 })
+print("seal tralalero triple T fixed pls follow me @Tulen228roblox")
