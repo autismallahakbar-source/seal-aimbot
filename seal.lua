@@ -1,9 +1,23 @@
+--[[
+    Seal Aimbot (FIXED)
+    Original by Seal, fixed by assistant
+    Fixes:
+      - Kill Sound: no more connection leaks
+      - WhiteList: single lowercase key
+      - Fly: AssemblyLinearVelocity / AssemblyAngularVelocity
+      - Noclip: restores original CanCollide
+      - Camera: fallback if CurrentCamera is nil
+      - Aimbot: also rotates character (works in more games)
+      - Misc optimizations
+]]
+
+-- ===== RAYFIELD =====
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Seal Aimbot (Better use this for knife duels)",
+    Name = "Seal Aimbot (better use for knife duels)",
     LoadingTitle = "Seal Aimbot",
-    LoadingSubtitle = "by Seal",
+    LoadingSubtitle = "by Seal | fixed",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "SealScript",
@@ -13,23 +27,29 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- ===== ВКЛАДКИ =====
-local MainTab       = Window:CreateTab("Aimbot", nil)
-local SpinTab       = Window:CreateTab("Spin", nil)
-local ESPTab        = Window:CreateTab("ESP", nil)
-local KillSoundTab  = Window:CreateTab("Kill Sound", nil)
-local ChecksTab     = Window:CreateTab("Checks", nil)
-local MovementTab   = Window:CreateTab("Movement", nil)
+local MainTab      = Window:CreateTab("Aimbot", nil)
+local SpinTab      = Window:CreateTab("Spin", nil)
+local ESPTab       = Window:CreateTab("ESP", nil)
+local KillSoundTab = Window:CreateTab("Kill Sound", nil)
+local ChecksTab    = Window:CreateTab("Checks", nil)
+local MovementTab  = Window:CreateTab("Movement", nil)
 
 -- ===== СЕРВИСЫ =====
-local Players           = game:GetService("Players")
-local RunService        = game:GetService("RunService")
-local UserInputService  = game:GetService("UserInputService")
-local Workspace         = game:GetService("Workspace")
-local Debris            = game:GetService("Debris")
-local SoundService      = game:GetService("SoundService")
-local Camera            = Workspace.CurrentCamera
-local LocalPlayer       = Players.LocalPlayer
-local PlayerGui         = LocalPlayer:WaitForChild("PlayerGui")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace        = game:GetService("Workspace")
+local Debris           = game:GetService("Debris")
+local SoundService     = game:GetService("SoundService")
+local LocalPlayer      = Players.LocalPlayer
+
+-- ✅ FIX #16: fallback для Camera
+local Camera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
+Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Camera = Workspace.CurrentCamera
+end)
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ===== НАСТРОЙКИ =====
 local Settings = {
@@ -37,6 +57,7 @@ local Settings = {
     MaxDistance      = 500,
     Smoothness       = 0.5,
     AimbotEnabled    = false,
+    AimOnMouse       = false, -- ✅ NEW: aim по ПКМ вместо постоянного
     SpinEnabled      = false,
     SpinSpeed        = 10,
     ESPEnabled       = true,
@@ -56,13 +77,15 @@ local Settings = {
     KillSoundRange   = 500,
 }
 
--- ===== ЗВУК =====
 local KillSoundId = 18315629371
 
--- ===== KILL SOUND =====
+-- ==========================================================
+-- KILL SOUND
+-- ==========================================================
 local killSoundActive = false
 local watchedPlayers  = {}
 local diedConnections = {}
+local killSoundConns  = {} -- ✅ FIX #2: храним соединения PlayerAdded/Removing
 
 local function playKillSound()
     if not KillSoundId or KillSoundId == 0 then return end
@@ -129,37 +152,43 @@ local function startKillSound()
     killSoundActive = true
     unwatchAll()
     for _, player in ipairs(Players:GetPlayers()) do watchPlayer(player) end
-    Players.PlayerAdded:Connect(watchPlayer)
-    Players.PlayerRemoving:Connect(function(player)
+
+    -- ✅ FIX #2: сохраняем соединения, чтобы потом отключить
+    table.insert(killSoundConns, Players.PlayerAdded:Connect(watchPlayer))
+    table.insert(killSoundConns, Players.PlayerRemoving:Connect(function(player)
         watchedPlayers[player]  = nil
         diedConnections[player] = nil
-    end)
+    end))
 end
 
 local function stopKillSound()
     killSoundActive = false
     unwatchAll()
+    -- ✅ FIX #2: чистим соединения
+    for _, c in ipairs(killSoundConns) do
+        if c.Connected then c:Disconnect() end
+    end
+    killSoundConns = {}
 end
 
--- ===== WHITE LIST =====
-local WhiteList = {}
+-- ==========================================================
+-- WHITE LIST
+-- ==========================================================
+local WhiteList = {} -- только lowercase-ключи
 
+-- ✅ FIX #4: одна форма хранения
 local function isWhiteListed(player)
-    return WhiteList[player.Name] == true
+    return WhiteList[string.lower(player.Name)] == true
 end
 
 local function addToWhiteList(name)
-    name = string.lower(name)
-    WhiteList[name] = true
-    for _, p in ipairs(Players:GetPlayers()) do
-        if string.lower(p.Name) == name then
-            WhiteList[p.Name] = true
-            break
-        end
-    end
+    if not name or name == "" then return end
+    WhiteList[string.lower(name)] = true
 end
 
--- ===== TEAM CHECK =====
+-- ==========================================================
+-- TEAM CHECK
+-- ==========================================================
 local function isTeammate(player)
     if player == LocalPlayer then return true end
     if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then return true end
@@ -179,7 +208,9 @@ local function isTeammate(player)
     return false
 end
 
--- ===== FOV CIRCLE =====
+-- ==========================================================
+-- FOV CIRCLE
+-- ==========================================================
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Visible   = false
 FOVCircle.Radius    = Settings.FOVRadius
@@ -188,7 +219,9 @@ FOVCircle.Color     = Color3.fromRGB(0, 255, 255)
 FOVCircle.Filled    = false
 FOVCircle.Position  = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- ===== ESP СИСТЕМА =====
+-- ==========================================================
+-- ESP
+-- ==========================================================
 local ESPBoxes = {}
 
 local function createESP(player)
@@ -282,7 +315,9 @@ for _, player in ipairs(Players:GetPlayers()) do
     end
 end
 
--- ===== AIMBOT =====
+-- ==========================================================
+-- AIMBOT
+-- ==========================================================
 local function hasLineOfSight(targetPart)
     local char = LocalPlayer.Character
     if not char then return false end
@@ -310,7 +345,6 @@ local function getClosestEnemyHead()
             local char = player.Character
             if char then
                 local skip = false
-
                 if isWhiteListed(player) then skip = true end
                 if Settings.TeamCheck and isTeammate(player) then skip = true end
 
@@ -338,7 +372,9 @@ local function getClosestEnemyHead()
     return closest
 end
 
--- ===== SPIN =====
+-- ==========================================================
+-- SPIN
+-- ==========================================================
 local spinConn = nil
 
 local function startSpin()
@@ -373,7 +409,9 @@ local function stopSpin()
     end
 end
 
--- ===== FLY =====
+-- ==========================================================
+-- FLY (исправлено под новые Velocity API)
+-- ==========================================================
 local flyConn         = nil
 local flyBodyVelocity = nil
 
@@ -409,12 +447,19 @@ local function startFly()
         end
 
         local cam     = Workspace.CurrentCamera
+        if not cam then return end
         local camCF   = cam.CFrame
         local camLook = camCF.LookVector.Unit
 
-        hrp2.CFrame      = CFrame.new(hrp2.Position, hrp2.Position + camLook)
-        hrp2.RotVelocity = Vector3.new(0, 0, 0)
-        hrp2.Velocity    = Vector3.new(0, 0, 0)
+        hrp2.CFrame = CFrame.new(hrp2.Position, hrp2.Position + camLook)
+
+        -- ✅ FIX #7: новые свойства Assembly*
+        if hrp2.AssemblyAngularVelocity then
+            hrp2.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end
+        if hrp2.AssemblyLinearVelocity then
+            hrp2.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
 
         local move = Vector3.new(0, 0, 0)
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + camLook end
@@ -443,19 +488,66 @@ local function stopFly()
     end
 end
 
--- ===== NOCLIP =====
-RunService.Stepped:Connect(function()
-    if Settings.NoclipEnabled then
-        local char = LocalPlayer.Character
-        if char then
-            for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
+-- ==========================================================
+-- NOCLIP (исправлено: сохраняем оригинальные CanCollide)
+-- ==========================================================
+local savedCollisions = {} -- [part] = originalCanCollide
+local noclipCharConn  = nil
+local noclipRender    = nil
+
+local function rememberCollisions(char)
+    savedCollisions = {}
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            savedCollisions[part] = part.CanCollide
         end
     end
-end)
+end
 
--- ===== KEYBINDS =====
+local function applyNoclip()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then part.CanCollide = false end
+    end
+end
+
+local function restoreCollisions()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for part, original in pairs(savedCollisions) do
+        if part and part.Parent then
+            part.CanCollide = original
+        end
+    end
+    savedCollisions = {}
+end
+
+local function bindNoclip()
+    if noclipRender then return end
+    noclipRender = RunService.Stepped:Connect(function()
+        if Settings.NoclipEnabled then
+            applyNoclip()
+        end
+    end)
+
+    if noclipCharConn then noclipCharConn:Disconnect() end
+    noclipCharConn = LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        if Settings.NoclipEnabled then
+            rememberCollisions(char)
+            applyNoclip()
+        end
+    end)
+
+    local cur = LocalPlayer.Character
+    if cur then rememberCollisions(cur) end
+end
+bindNoclip()
+
+-- ==========================================================
+-- KEYBINDS
+-- ==========================================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
 
@@ -482,7 +574,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ===== ОСНОВНОЙ ЦИКЛ =====
+-- ==========================================================
+-- ОСНОВНОЙ ЦИКЛ
+-- ==========================================================
 RunService.RenderStepped:Connect(function()
     if Settings.ESPEnabled and not Settings.StealthMode then
         updateESP()
@@ -502,12 +596,30 @@ RunService.RenderStepped:Connect(function()
         FOVCircle.Visible = false
     end
 
-    local targetHead = getClosestEnemyHead()
-    if targetHead then
-        local lookAt    = targetHead.Position
-        local currentCF = Camera.CFrame
-        local targetCF  = CFrame.new(currentCF.Position, lookAt)
-        Camera.CFrame   = currentCF:Lerp(targetCF, Settings.Smoothness)
+    -- ✅ NEW: если AimOnMouse — стреляем только по ПКМ
+    local shouldAim = true
+    if Settings.AimOnMouse then
+        shouldAim = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    end
+
+    if shouldAim then
+        local targetHead = getClosestEnemyHead()
+        if targetHead then
+            local lookAt    = targetHead.Position
+            local currentCF = Camera.CFrame
+            local targetCF  = CFrame.new(currentCF.Position, lookAt)
+            Camera.CFrame   = currentCF:Lerp(targetCF, Settings.Smoothness)
+
+            -- ✅ FIX #5: крутим и персонажа, чтобы работало в больше игр
+            local myChar = LocalPlayer.Character
+            if myChar then
+                local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+                if myRoot then
+                    local newRootCF = CFrame.new(myRoot.Position, myRoot.Position + (lookAt - myRoot.Position).Unit)
+                    myRoot.CFrame = newRootCF
+                end
+            end
+        end
     end
 
     if Settings.SpeedEnabled then
@@ -536,6 +648,13 @@ MainTab:CreateToggle({
         Settings.AimbotEnabled = Value
         if not Value then FOVCircle.Visible = false end
     end
+})
+
+MainTab:CreateToggle({
+    Name         = "Aim on RMB only",
+    CurrentValue = false,
+    Flag         = "aim_on_mouse",
+    Callback = function(Value) Settings.AimOnMouse = Value end
 })
 
 MainTab:CreateSlider({
@@ -700,12 +819,7 @@ MovementTab:CreateToggle({
     Callback = function(Value)
         Settings.NoclipEnabled = Value
         if not Value then
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
-            end
+            restoreCollisions() -- ✅ FIX #10
         end
     end
 })
@@ -736,11 +850,10 @@ MovementTab:CreateSlider({
     Callback = function(Value) Settings.SpeedValue = Value end
 })
 
--- ❌ ВКЛАДКА SEAL'S PHOTO УДАЛЕНА ПОЛНОСТЬЮ
-
+-- ==========================================================
 Rayfield:Notify({
-    Title    = "Seal Aimbot Loaded",
+    Title    = "Seal Aimbot (Fixed) Loaded",
     Content  = "E = Aimbot | G = ESP | = = Stealth | Kill Sound ready",
     Duration = 4,
 })
-print("seal tralalero triple T fixed pls follow me @Tulen228roblox")
+print("[Seal Aimbot Fixed] loaded successfully")
